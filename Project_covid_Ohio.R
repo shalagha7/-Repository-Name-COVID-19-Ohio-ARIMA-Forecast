@@ -1,0 +1,290 @@
+---
+  title: "Project - 2 "
+author: "Shalagha Mundepi"
+date: "2024-01-29"
+output: html_document
+---
+
+
+# install.packages("forecast")
+# install.packages("readxl")
+library(forecast)
+library(readxl)
+library(dplyr)
+library(lubridate)
+library(readr)
+
+library("tseries")
+rm(list=ls(all=TRUE)) 	# clear data
+
+]
+
+# turn off scientific notation
+options(scipen = 999) 
+
+# Read the data
+covid_data <- read_excel("2020_Covid_Data.xlsx")
+
+
+# Now 'Date' will be in "yyyy-mm-dd" format'
+
+# Parse the 'Date' column as numeric if it's read as a character
+covid_data <- covid_data %>%
+  mutate(Date = as.numeric(Date))
+
+# Convert from Excel's serial date number to Date class
+covid_data <- covid_data %>%
+  mutate(Date = as.Date(Date, origin = "1899-12-30"))
+
+covid_data
+
+# Filter data according to your state -OHIO in this case
+
+state_2020 <- covid_data[,"OH"] #<----------------------change your state accordingly
+state_2020
+
+#reading the state data from 22nd Jan 2020 - 31st Dec 2020 from cases spreadsheet
+state_2020 <- state_2020[1:345, 1]
+state_2020
+
+# Representing Data as Time Series Object
+
+# Converts the data as time series object with start date and frequency (daily here)- 
+#Hence, we choose 345 days starting ( 22/01/2020 - 31/12/2020)
+
+state_2020 <- ts(state_2020, frequency = 345, start = c(2020,1,22))
+
+
+]
+# 1. Step-by-Step fit different ARIMA (p,d,q) x (P, D, Q) for the confirmed cases. Can you discover a better model than auto.arima?
+
+
+
+
+# ALWAYS plot time series to see patterns: trend, cycle, variance over time
+
+
+##### Plotting the given Data as Time Series Object #####
+
+plot.ts(state_2020)	
+
+
+
+
+
+
+# ARIMA models
+
+# Step-by-Step
+## STWP 1 -  Is the time series stationary? 
+
+# check how many differentiate we need 
+ndiffs(state_2020)               # ndiffs codes shows normally how many difference we need to make, 
+
+print("ndiffs function normally shows us how many difference we need to make, in this case of state -OH, 2 differences are needed")                                 
+
+
+# Use Augmented Dickey-Fuller Test to test stationarity
+adf.test(state_2020)	# if p-value is large (> 0.10), then nonstationary
+
+print("Since the p-value is large (> 0.10), then nonstationary ")
+
+
+y1 <- diff(state_2020, differences = 1)			
+plot.ts(y1)		# looks non stationary visually
+adf.test(y1)	# p-value is large
+
+y2 <- diff(state_2020, differences = 2)	
+plot.ts(y2)		# looks stationary visually
+adf.test(y2)	 # if p-value is less (< 0.10), then stationary
+
+print(" Since the p-value is less than 0.10 , then stationary. Hence, fix d = 2 in ARIMA models to be fitted ")
+
+## STEP 2 - Decide AR(p) or MA(q) or both ARMA(p,q).
+
+# To decide AR(p), plot Pacf. For AR(p) => Pacf becomes zero at some lag p
+Pacf(y2, lwd=2, lag.max = 10, main = "Covid cases")			       	# Pacf suggests p = 4
+
+print (" The 4 prominent peaks in PACF Plot suggest p = 4 ")
+
+# To decide MA, plot Acf. For MA(q) => Acf becomes zero at some lag q
+Acf(y2, lwd=2, lag.max = 10, main = "Covid cases")                 # Acf suggests q = 1 
+
+print (" The 1 prominent peak in ACF Plot suggest q = 1 ")
+```
+
+```{r}
+
+
+#STEP 3 -  Fit the auto.arima model
+auto_model <- auto.arima(state_2020) # fits ARIMA(p,d,q) x (P, D, Q) automatically
+summary(auto_model)
+
+
+# My Auto Arima 
+
+# ARIMA(2,2,4) 
+
+# Coefficients:
+#         ar1      ar2      ma1     ma2      ma3     ma4
+#      0.6759  -0.7956  -1.9250  2.0981  -1.1230  0.2093
+#s.e.  0.0656   0.0536   0.0989  0.1994   0.1933  0.0966
+
+#sigma^2 = 2313295:  log likelihood = -2998.82
+#AIC=6011.63   AICc=6011.97   BIC=6038.5
+
+#Training set error measures:
+#                  ME     RMSE      MAE      MPE     MAPE     MASE       ACF1
+#Training set 98.0491 1503.214 653.4159 1.563566 2.495119 0.320933 0.01471629
+
+
+
+# Find nearby Arima models from the auto Arima, d = 2; q = 2; p = 4 (+/-1 for q & p)
+
+m1 <- Arima(state_2020, order = c(1,2,4))	#auto arima reference model
+m2 <- Arima(state_2020, order = c(3,2,4))	
+m3 <- Arima(state_2020, order = c(1,2,5))	
+m4 <- Arima(state_2020, order = c(3,2,5))
+m5 <- Arima(state_2020, order = c(1,2,3)) 
+m6 <- Arima(state_2020, order = c(3,2,3))
+m7 <-Arima(state_2020, order = c(2,2,3))
+
+```
+
+
+```{r}
+summary(m1)
+
+### find the model with smallest MAPE
+
+#ARIMA(2,2,4) 
+
+#Coefficients:
+#AIC=6011.63   AICc=6011.97   BIC=6038.5
+
+#Training set error measures:
+#                  ME     RMSE      MAE      MPE     MAPE     MASE       ACF1
+#Training set 98.0491 1503.214 653.4159 1.563566 2.495119 0.320933 0.01471629
+
+
+
+
+summary(m2)
+
+#ARIMA(3,2,4) 
+
+#AIC=6015.3   AICc=6015.73   BIC=6046
+
+#Training set error measures:
+#                   ME     RMSE      MAE      MPE    MAPE      MASE        ACF1
+#Training set 103.0075 1509.794 660.6608 1.564688 2.44908 0.3244914 -0.02049326
+
+
+
+summary(m3)
+#ARIMA(1,2,5) 
+
+#AIC=6015.23   AICc=6015.56   BIC=6042.09
+
+#Training set error measures:
+#                   ME     RMSE      MAE     MPE    MAPE      MASE        ACF1
+#Training set 105.4997 1515.168 615.7904 1.54786 2.36073 0.3024528 -0.01880083
+
+
+summary(m4)
+
+
+# Series: state_2020 
+# ARIMA(3,2,5) 
+# 
+# Coefficients:
+#          ar1      ar2      ar3      ma1     ma2      ma3      ma4     ma5
+#       0.3553  -0.5397  -0.2741  -1.5991  1.3404  -0.1528  -0.4361  0.2107
+# s.e.  0.3097   0.2099   0.2550   0.3027  0.5749   0.6282   0.3431  0.0855
+# 
+# sigma^2 = 2349218:  log likelihood = -3000.64
+# AIC=6019.28   AICc=6019.82   BIC=6053.82
+# 
+# Training set error measures:
+#                    ME     RMSE      MAE      MPE     MAPE MASE        ACF1
+# Training set 78.42589 1510.339 680.5821 1.555653 2.526873  NaN -0.01300027
+
+
+
+summary(m5)
+#ARIMA(1,2,3) 
+
+#AIC=6038.16   AICc=6038.34   BIC=6057.35
+
+#Training set error measures:
+#                   ME     RMSE      MAE      MPE     MAPE      MASE        ACF1
+#Training set 77.38903 1576.894 570.1484 1.438208 2.173737 0.2800352 -0.04146336
+
+
+summary(m6)
+# ARIMA(3,2,3) 
+
+#AIC=6021.63   AICc=6021.97   BIC=6048.5
+
+#Training set error measures:
+#                   ME     RMSE      MAE     MPE     MAPE      MASE         ACF1
+#Training set 80.84571 1529.633 612.9061 1.44668 2.306296 0.3010361 -0.009421833
+
+
+###### The smallest MAPE models####
+###### 1. m5 ARIMA(1,2,3) MAPE 2.173737  ** the best model
+###### 2. m6 ARIMA(1,2,3)  MAPE 2.306296 
+###### 3. m3 ARIMA(3,2,3)  MAPE 2.36073
+
+summary(m7)
+
+print(" Out of all the 5 models we see that Model 5 (m_5) - ARIMA(1,2,3)  has the lowest MAPE (Mean Absolute Percentage Errors) , hence , we go ahead with the same for our further forecast")
+
+
+
+
+# Consider Seasonal ARIMA(p,d,q) x (P, D, Q) components when seasonality is expected/suspected
+
+m5_1 <- Arima(state_2020, order = c(1,2,3),seasonal = list(order = c(0,0,1), period = 52))
+m5_2 <- Arima(state_2020, order = c(1,2,3),seasonal = list(order = c(0,1,0), period = 52))
+m5_3 <- Arima(state_2020, order = c(1,2,3),seasonal = list(order = c(1,0,0), period = 52))
+
+summary(m5_1)
+summary(m5_2)
+summary(m5_3)
+
+
+### again, find the model with the smallest MAPE
+### in this case m5_2 has the smallest MAPE, 
+# ARIMA(1,2,3)(0,1,0)[52] 
+
+#AIC=5193.6   AICc=5193.82   BIC=5211.97
+
+#Training set error measures:
+#                   ME     RMSE      MAE      MPE     MAPE      MASE        ACF1
+#Training set 27.13212 1630.185 675.8874 0.540963 1.341451 0.3319702 -0.02475484
+
+print (" After checking for the seasonality component combinations, we again check for the lowest MAPE which happens to be  ARIMA(1,2,3)(0,1,0) .Hence, we go ahead with the forecasted values from the same model")
+
+
+
+# 2. Make Out-of-Sample Forecasts with Prediction Interval based on your retained model
+
+
+m5_2.predict <- forecast:::forecast.Arima(m5_2, h = 41, level = c(68, 90)) ## Predict for 41days 
+
+#(Daily forecast from 1st Jan 2021 through 10 th Feb 2021.)
+
+plot(m5_2.predict)	# prints numerical values of forecasts and CIs.
+
+summary (m5_2.predict)
+
+print("The below are the forecasted values for the 41 days - 1/01/2021 to 10/02/2021")
+
+forecasted_values<- as.integer(m5_2.predict$mean)
+for (value in forecasted_values) {
+  cat(value, "\n")
+}
+##from point 346~386 is your forecast for 1st Jan 2021 through 10 th Feb 2021
+
+
